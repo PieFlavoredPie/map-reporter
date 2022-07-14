@@ -1,0 +1,26 @@
+{% extends "dashboard_base.html" %}
+{% load dashboard_tags %}
+{% load static %}
+{% load thumbnail %}
+{% block title %}
+    {{'Αποτελέσματα Αναζήτησης'}}
+{% endblock %}
+
+
+{% block headEnd %}
+<style>
+ 
+
+</style>
+
+<!--scripts go here-->
+{% endblock headEnd %}
+
+{% block main %}
+<h3 class="mt-4 mb-4">Αποτελέσματα αναζήτησης για: <span id="term">'{{term}}'</span></h3>
+
+<div id="results-response">
+        {{results|safe}}
+</div>
+
+{% endblock %}
