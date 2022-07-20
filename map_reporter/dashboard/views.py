@@ -312,7 +312,7 @@ class AllProducts(TemplateView):
                         .timestamp
                     )
                     tmp = RetailPrice.objects.filter(
-                        timestamp=product_latest_timestamp,
+                        timestamp__range=(product_latest_timestamp - datetime.timedelta(hours=1), product_latest_timestamp),
                         product=product,
                         shop__seller=user,
                     )
@@ -323,7 +323,8 @@ class AllProducts(TemplateView):
                         .timestamp
                     )
                     tmp = RetailPrice.objects.filter(
-                        timestamp=product_latest_timestamp, product=product
+                        timestamp__range=(product_latest_timestamp - datetime.timedelta(hours=1), product_latest_timestamp),
+                        product=product,
                     )
                 this_products_below = 0
                 this_products_equal = 0
@@ -613,7 +614,8 @@ class CategoryInfo(TemplateView):
                     )
                     ltst_pr_rec = RetailPrice.objects.filter(
                         product=product,
-                        timestamp=product_latest_timestamp,
+                        timestamp__range=(product_latest_timestamp - datetime.timedelta(minutes=30), product_latest_timestamp),
+                        # timestamp=product_latest_timestamp,
                         shop__seller=user,
                     )
                 else:
@@ -623,7 +625,9 @@ class CategoryInfo(TemplateView):
                         .timestamp
                     )
                     ltst_pr_rec = RetailPrice.objects.filter(
-                        product=product, timestamp=product_latest_timestamp
+                        product=product,
+                        timestamp__range=(product_latest_timestamp - datetime.timedelta(minutes=30), product_latest_timestamp),
+                        # timestamp=product_latest_timestamp
                     )
 
                 products_below_increased = False
@@ -644,7 +648,7 @@ class CategoryInfo(TemplateView):
             product.shops_below = shops_below
             product.shops_equal = shops_equal
             product.shops_above = shops_above
-            product.shops_count = shops_below + shops_equal + shops_above
+            product.shop_count = shops_below + shops_equal + shops_above
             category.products_below = products_below
             category.products_count = products_count
             category.products_ok = products_count - products_below
@@ -845,7 +849,6 @@ class ProductInfo(TemplateView):
     def get_context_data(self, **kwargs):
         date_picker = DatePicker
         context = super(ProductInfo, self).get_context_data(**kwargs)
-
         # product = Product.objects.get(id=kwargs['pk'])
         product = get_object_or_404(Product, id=kwargs["pk"])
         # urls = Page.objects.filter(product_id=kwargs['pk'])
@@ -951,23 +954,35 @@ def get_change(current, previous):
 
 
 def update_table(filtered_retail_prices, seller_flag):
-    updated_table = """<table id="product_prices_table" hx-swap-oob="true:#product_prices_table" data-toggle="table" data-show-columns="true" data-show-columns-toggle-all="true" data-pagination="true" data-show-toggle="true" data-show-fullscreen="true" data-buttons="buttons" data-buttons-align="left" data-buttons-class="primary" data-pagination-v-align="both" data-remember-order="true" data-sort-reset="true" data-filter-control="true" data-show-search-clear-button="true" data-show-export="true" data-show-print="true" data-sticky-header="true" data-show-multi-sort="true" >
-        <thead>
-            <tr>
-                <th data-sortable="true" data-field="shop_t" data-filter-control="input">Κατάστημα</th>
-                <th data-sortable="true" data-field="retail_price_t">Λ. Τιμή</th>
-                <th data-sortable="true" data-field="target_price_t">Target Price</th>
-                <th data-sortable="true" data-field="diff_t">Diff</th>
-                <th data-sortable="true" data-field="per_diff_t">Diff %</th>
-                <th data-sortable="true" data-field="official_reseller_t" data-filter-control="select">Επ. Μεταπωλητής</th>"""
+    updated_table = """<table id='table_1' class="data-table display">
+                <thead>
+                    <tr class="bg-light">
+                        <th class="text-filter">Κατάστημα</th>
+                        <th>Τιμή</th>
+                        <th>Τιμή MAP</th>
+                        <th>Διαφ.</th>
+                        <th>Διαφ. %</th>
+                        <th class="select-filter">Επ. Μεταπωλ.</th>"""
     if not seller_flag:
-        updated_table += """<th data-sortable="true" data-field="seller_t" data-filter-control="select">Πωλητής</th>"""
+        updated_table += """<th class="select-filter">Πωλητής</th>"""
 
     updated_table += """
-                <th data-sortable="true" data-field="date_t">Ημερομηνία</th>
-            </tr>
-        </thead>
-        <tbody>"""
+                <th>Ημερομηνία</th>
+                    </tr>
+                    <tr class="bg-light head-filters">
+                        <th class="text">Κατάστημα</th>
+                        <th class="no-filter">Τιμή</th>
+                        <th class="no-filter">Τιμή MAP</th>
+                        <th class="no-filter">Διαφ.</th>
+                        <th class="no-filter">Διαφ. %</th>
+                        <th class="select">Επ. Μεταπωλ.</th>"""
+
+    if not seller_flag:
+        updated_table += """<th class="select">Πωλητής</th>"""
+
+    updated_table += """<th class="date-filter"><div id="reportrange" class="btn btn-secondary"> <span></span> <b class="caret"></b></div></th>
+                    </tr>
+                </thead>"""
 
     for retailprice in filtered_retail_prices:
         is_shop_official_reseller = retailprice.is_shop_official_reseller()
@@ -1358,7 +1373,7 @@ class DataTables(TemplateView):
                 'daterange_timestamp': daterange_timestamp,
                 "seller_flag": seller_flag,
                 "user": user,
-                "user_is_staff": user.is_staff,
+                "user_is_staff": user.is_staff,                
             }
         )
         return context
