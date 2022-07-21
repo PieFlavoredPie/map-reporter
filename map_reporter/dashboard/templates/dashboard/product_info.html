@@ -163,7 +163,7 @@
                 </div>
                 <div class="card-body align-items-center d-flex" style="height:500px;"><canvas id="MinPriceChart" width="100%" height="40"></canvas></div>
                 <div class="card-footer small text-muted">Το παραπάνω αναλυτικό γράφημα απεικονίζει την πορεία των ελάχστων τιμών του προϊόντος από όλα τα καταστήματα μέσα στον χρόνο. Μέσω του φίλτρου μπορείτε να επιλέξετε συγκεκριμένες ημερομηνίες και καταστήματα, ώστε να εμφανιστούν οι τιμές στο διάστημα από τα επιλεγμένα καταστήματα.</div>
-                <div class="card-footer small text-muted">Τελευταία ενημέρωση {{ latest_timestamp}}</div>
+                <div class="latest_timestamp card-footer small text-muted">Τελευταία ενημέρωση {{ latest_timestamp}}</div>
             </div>
         </div>
 
@@ -175,7 +175,7 @@
                 </div>
                 <div class="card-body align-items-center d-flex" style="height:500px;"><canvas id="myPieChart" width="100%" height="50"></canvas></div>
                 <div class="card-footer small text-muted">Στο παραπάνω γράφημα απεικονίζεται ο αριθμός των καταστημάτων στα οποία η τιμή του προϊόντος είναι κάτω, ίση με ή πάνω από την τιμή στόχο.</div>
-                <div class="card-footer small text-muted">Τελευταία ενημέρωση {{ latest_timestamp}}</div>
+                <div class="latest_timestamp card-footer small text-muted">Τελευταία ενημέρωση {{ latest_timestamp}}</div>
             </div>
         </div>
         
@@ -214,11 +214,12 @@
                         {% if not seller_flag %}
                             <th class="select">Πωλητής</th>
                         {% endif %}
-                        <th class="date-filter"><div id="reportrange" class="btn btn-secondary"> <span></span> <b class="caret"></b></div></th>
+                        <th class="no-filter">Ημερομηνία</th>
+                        {% comment %} <th class="date-filter"><div id="reportrange" class="btn btn-secondary"> <span></span> <b class="caret"></b></div></th> {% endcomment %}
                     </tr>
                 </thead>
                 <tbody>
-                    {% for retail_price in retailprices %}
+                    {% for retail_price in table_retailprices %}
                     {% if retail_price.price|sub:retail_price.curr_target_price < 0 %}
                         <tr class="bg-danger" style="--bs-bg-opacity: .1;">
                     {% else %}
@@ -250,7 +251,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            {{retail_price.source}}
+                            {{retail_price.source.domain}}
                         </td>
                         <td>
                             {{retail_price.shop.is_key_account}}
@@ -424,6 +425,11 @@
             // Update the charts
             const my_response_text = evt.detail.xhr.response;
             my_response = JSON.parse(my_response_text);
+            console.log(my_response);
+            new_timestamp = "Τελευταία ενημέρωση " + my_response.date_to;
+            $('.latest_timestamp').each(function(i, e){
+                $(e).text(new_timestamp);
+            });
             new_pie_data = [my_response.shops_below, my_response.shops_equal, my_response.shops_above];
             myPieChart.data.datasets[0].data = new_pie_data;
             myPieChart.update();
@@ -463,10 +469,17 @@
             };
             myLineChart.data = new_mixed_data;
             myLineChart.update();
+
+            // Update the table
             table_1.destroy();
             table = $('#table_1');
-
             table.html(my_response.table);
+            {% if not seller_flag %}
+                date_column_sort = 9;
+            {% else%}
+                date_column_sort = 8;
+            {% endif %}
+            config.order = [[date_column_sort, 'desc'], [1, 'asc'],];
             table_1 = $('#table_1').DataTable(config);
             config_the_table();
             table_1.draw();
@@ -526,7 +539,7 @@ $(document).ready(function() {
     } );
 
 /*DATERANGEPICKER START*/
-$(function() {
+/*$(function() {
     var start = moment("2022-01-01 12:34:16");
     var the_end = '{{daterange_timestamp}}';
     var end = moment(the_end);
@@ -587,18 +600,18 @@ $(function() {
 
 table_1.draw();
   $.fn.dataTable.ext.search.pop();
-});
+});*/
 } //config the table ends
 
 
   //initialise data table
-{% if not seller_flag %}
+/*{% if not seller_flag %}
   date_column_sort = 9;
 {% else%}
   date_column_sort = 8;
-{% endif %}
+{% endif %}*/
     config = {
-        order: [[date_column_sort, 'desc'],[1, 'asc']],
+        order: [[1, 'asc'],],
         dom: 'Bfplrtipl',
         info:true,
         searching: true,
@@ -650,11 +663,14 @@ table_1.draw();
                     },
                 },
                 customize: function(doc){
-                    doc.content[1].table.dontBreakRows = true;
-                    doc.styles.title = {
+                    doc.content[1].table.dontBreakRows = true; 
+                    doc.pageMargins = [ 1,1,1,1 ];
+                    doc.styles.tableHeader = {
                         alignment: "center",
-                        fontSize: 12,
-                        noWrap: true,
+                        bold: true,
+                        color: "white",
+                        fillColor: "#2d4154",
+                        fontSize: 8,
                     };
                     doc.styles.redcelleven = {
                         color: '#dc3545',
@@ -670,6 +686,7 @@ table_1.draw();
                     doc.styles.redrowodd = {
                         fillColor: '#e2d2d4',
                     };
+                    doc.defaultStyle.fontSize = 8;
                     for(j = 1; j < doc.content[1].table.body.length; j++){
                         red_row = false;
                         red_cell = false;

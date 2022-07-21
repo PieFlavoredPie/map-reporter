@@ -48,9 +48,10 @@
                                 <th class="text-filter">SKU</th>
                                 <th class="select-filter">Κατηγορία</th>
                                 <th>Τιμή MAP</th>
-                                <th># Καταστημάτων</th>
+                                <th>Καταστήματα</th>
                                 <th>Κατ. Κάτω</th>
-                                <th>Κατ. OK</th>
+                                <th>Κατ. Ίσα</th>
+                                <th>Κατ. Πάνω</th>
                             </tr>
                             <tr class="bg-light head-filters">
                                 <th class="no-filter">Φωτογραφία</th>
@@ -59,9 +60,10 @@
                                 <th class="text">SKU</th>
                                 <th class="select">Κατηγορία</th>
                                 <th class="no-filter">Τιμή MAP</th>
-                                <th class="no-filter"># Καταστημάτων</th>
+                                <th class="no-filter">Καταστήματα</th>
                                 <th class="no-filter">Κατ. Κάτω</th>
-                                <th class="no-filter">Κατ. OK</th>
+                                <th class="no-filter">Κατ. Ίσα</th>
+                                <th class="no-filter">Κατ. Πάνω</th>
                             </tr>
                         </thead>
                           <tbody>
@@ -101,6 +103,9 @@
                                   </td>
                                   <td>
                                   {{product.shops_equal}}
+                                  </td>
+                                  <td>
+                                  {{product.shops_above}}
                                   </td>
                               </tr>
                               {% endfor %}
@@ -155,7 +160,8 @@
                                 {% if not seller_flag %}
                                     <th class="select">Πωλητής</th>
                                 {% endif %}
-                                <th class="date-filter"><div id="reportrange" class="btn btn-secondary"> <span></span> <b class="caret"></b></div></th>
+                                <th class="no-filter">Ημερομηνία</th>
+                                {% comment %} <th class="date-filter"><div id="reportrange" class="btn btn-secondary"> <span></span> <b class="caret"></b></div></th> {% endcomment %}
                             </tr>
                         </thead>
                         <tbody>
@@ -219,7 +225,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {{retail_price.source}}
+                                        {{retail_price.source.domain}}
                                     </td>
                                     <td>
                                         {{retail_price.shop.is_key_account}}
@@ -351,11 +357,12 @@ $(document).ready(function() {
                 customize: function(doc){
                     doc.content[1].table.dontBreakRows = true; 
                     doc.pageMargins = [ 1,1,1,1 ];
-                    doc.content[1].table.dontBreakRows = true;
-                    doc.styles.title = {
+                    doc.styles.tableHeader = {
                         alignment: "center",
-                        fontSize: 12,
-                        noWrap: true,
+                        bold: true,
+                        color: "white",
+                        fillColor: "#2d4154",
+                        fontSize: 8,
                     };
                     doc.styles.redcelleven = {
                         color: '#dc3545',
@@ -371,6 +378,7 @@ $(document).ready(function() {
                     doc.styles.redrowodd = {
                         fillColor: '#e2d2d4',
                     };
+                    doc.defaultStyle.fontSize = 8;
                     var photo_index = 0;
                     for(i = 0; i < doc.content[1].table.body[0].length; i++){
                         if (doc.content[1].table.body[0][i].text == 'Φωτογραφία'){
@@ -819,7 +827,7 @@ $(document).ready(function() {
     } );
 
 /*DATERANGEPICKER START*/
-$(function() {
+/*$(function() {
     var start = moment("2022-01-01 12:34:16");
     var the_end = '{{daterange_timestamp}}';
     var end = moment(the_end);
@@ -880,7 +888,7 @@ $(function() {
 
 table_2.draw();
   $.fn.dataTable.ext.search.pop();
-});
+});*/
 } );
 </script>
 
