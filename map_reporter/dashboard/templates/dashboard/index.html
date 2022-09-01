@@ -79,7 +79,7 @@
         <div class='card mb-4'>
             <div class='card-header mb-4'>
                 <i class='fas fa-table me-1'></i>
-                Τελευταίες τιμές όλων των ενεργών προϊόντων με πρόβλημα
+                Τελευταίες χαμηλότερες τιμές όλων των ενεργών προϊόντων με πρόβλημα
             </div>
             <div class="card-body overflow-auto">
 
@@ -105,7 +105,7 @@
                             {% endif %}
                             <th>Ημερομηνία</th>
                         </tr>
-                    
+
                         <tr class="bg-light head-filters">
                             <th class="no-filter">Φωτογραφία</th>
                             <th class="text">Μοντέλο</th>
@@ -117,8 +117,8 @@
                             <th class="no-filter">Τιμή MAP</th>
                             <th class="no-filter">Διαφ.</th>
                             <th class="no-filter">Διαφ. %</th>
+                            <th class="select">Πηγή</th>
                             <th class="select">Key Account</th>
-                            <th class="select">Επ. Μεταπωλ.</th>
                             <th class="select">Επ. Μεταπωλ.</th>
 
                             {% if not seller_flag %}
@@ -130,40 +130,32 @@
                     </thead>
                     <tbody>
                     {% for retail_price in retail_prices %}
-                        {% if retail_price.product.active %}
-                        {% if retail_price.price|sub:retail_price.curr_target_price < 0 %}
                             <tr class="bg-danger" style="--bs-bg-opacity: .1;">
-                        {% else %}
-                            <tr>
-                        {% endif %}
                                 <td>
-                                    <a href="{% url 'product_info' retail_price.product.id %}">
-                                    {% thumbnail retail_price.product.image table_image_size as im %}
-                                        <img src="{{ im.url }}" aria-src="{{ im.url|datalize }}" width="{{ im.width }}" height="{{ im.height }}" alt="{{retail_price.product.name}}" class="prod-img">
-                                    {% endthumbnail %}
-                                    </a>
-                                    
-                                </td>
-                                <td>
-                                    <a href="{% url 'product_info' retail_price.product.id %}" class="link-dark">
-                                        {{retail_price.product.model}}
+                                    <a href="{% url 'product_info' retail_price.product_id %}" class="link-dark">
+                                        <img src="{{retail_price.product_image}}" aria-src="{{ retail_price.product_image|datalize }}" alt="{{retail_price.product}}" loading="lazy" class="product_image">
                                     </a>
                                 </td>
                                 <td>
-                                    <a href="{% url 'manufacturer_info' retail_price.product.manufacturer.id %}" class="link-dark">
-                                        {{retail_price.product.manufacturer}}
+                                    <a href="{% url 'product_info' retail_price.product_id %}" class="link-dark">
+                                        {{retail_price.product_model}}
                                     </a>
                                 </td>
                                 <td>
-                                    <a href="{% url 'category_info' retail_price.product.main_category.id %}" class="link-dark">
-                                        {{retail_price.product.main_category}}
+                                    <a href="{% url 'manufacturer_info' retail_price.product_manufacturer_id %}" class="link-dark">
+                                        {{retail_price.product_manufacturer}}
                                     </a>
                                 </td>
                                 <td>
-                                    {{retail_price.product.sku}}
+                                    <a href="{% url 'category_info' retail_price.product_category_id %}" class="link-dark">
+                                        {{retail_price.product_category}}
+                                    </a>
                                 </td>
                                 <td>
-                                    <a href="{% url 'shop_info' retail_price.shop.id %}" class="link-dark">{{retail_price.shop}}</a>
+                                    {{retail_price.product_sku}}
+                                </td>
+                                <td>
+                                    <a href="{% url 'shop_info' retail_price.shop_id %}" class="link-dark">{{retail_price.shop}}</a>
                                 </td>
                                 <td>
                                     {{retail_price.price}} €
@@ -194,7 +186,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {{retail_price.source.domain}}
+                                    {{retail_price.source_domain}}
                                 </td>
                                 <td>
                                     {{retail_price.shop.is_key_account}}
@@ -203,11 +195,16 @@
                                     {{ retail_price.is_shop_official_reseller }}
                                 </td>
                                 {% if not seller_flag %}
-                                <td>{{ retail_price.shop.seller.last_name }}</td>
+                                <td>{% if retail_price.shop.seller.last_name %}
+                                        {{retail_price.shop.seller.last_name}}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
                                 {% endif %}
                                 <td>{{retail_price.timestamp|date:"d/m/Y, H:i"}}</td>
                             </tr>
-                        {% endif %}
+                        {% comment %} {% endif %} {% endcomment %}
                     {% endfor %}
                     </tbody>
                 </table>
@@ -232,7 +229,7 @@
         maintainAspectRatio: false,
     }
     });
-    
+
     // Pie Chart for shops
     var ctx = document.getElementById('PieChartShops');
     var myPieChart = new Chart(ctx, {
@@ -270,7 +267,7 @@
             export_cols.push(i);
         }
       }
-    
+
     {% if not seller_flag %}
         date_column_sort = 14;
     {% else %}
@@ -342,7 +339,7 @@
                         },
                     },
                     customize: function(doc){
-                        doc.content[1].table.dontBreakRows = true; 
+                        doc.content[1].table.dontBreakRows = true;
                         doc.pageMargins = [ 1,1,1,1 ];
                         doc.styles.tableHeader = {
                             alignment: "center",
@@ -419,7 +416,7 @@
                         columns: export_cols,
                         stripHtml: true,
                         },
-                }, 
+                },
                 {
                     extend:'csv',
                     className: 'btn btn-secondary',
@@ -451,13 +448,13 @@
                                 }
                                 else if (item.nodeName == 'STRONG'){
                                     result += item.outerHTML;
-                                } 
-                                else if (item.nodeName == 'A'){                                       
+                                }
+                                else if (item.nodeName == 'A'){
                                     result += item.outerHTML;
                                 }
                                 else {
                                     result += item.innerText;
-                                } 
+                                }
                               });
                               return result;
                             }
@@ -465,7 +462,7 @@
                         },
                         //customise print output
                         //function gives us three params, the window that will be printed, the print button object, and the data_tables api object
-                        //using jquery we force the document to print background colors, get all the rows that are colored red in the original document(.bg-danger) and pass that color to the rows in the print document, give some styling to the header, and fix some text styling issues. 
+                        //using jquery we force the document to print background colors, get all the rows that are colored red in the original document(.bg-danger) and pass that color to the rows in the print document, give some styling to the header, and fix some text styling issues.
                     customize: function(window, print_btn_object, api){
                         rows = api.rows({search:'applied'}).nodes();
                         columns = api.columns({search:'applied'}).nodes();
@@ -523,9 +520,9 @@
                     });
                 },
         });
-     
-      
-     
+
+
+
         // Filter event handler
         //if table is undefined, refresh the page.
         $( table_1.table().container() ).on( 'keyup', 'thead input', function () {
@@ -537,11 +534,11 @@
         var start = moment("2022-01-01 12:34:16");
         var the_end = '{{daterange_timestamp}}';
         var end = moment(the_end);
-    
+
         function cb() {
           $('#reportrange span').html('Επιλέξτε ημερομηνία');
         }
-    
+
         $('#reportrange').daterangepicker({
           startDate: moment().subtract(6, 'days'),
           endDate: moment(),
@@ -558,12 +555,12 @@
               format:"D/M/YYYY",
           },
         }, cb);
-    
+
         cb();
-    
+
       });
-     
-    
+
+
       $('#reportrange').on('apply.daterangepicker', function(ev, picker) {
        var start = picker.startDate;
        var end = picker.endDate;
@@ -575,7 +572,7 @@
             var max = end;
             //dynamically find date column(must be the last column of the table)
             var startDate = moment(data[date_column], 'D/M/YYYY');
-            
+
             if (min == null && max == null) {
               return true;
             }
@@ -596,6 +593,6 @@
       $.fn.dataTable.ext.search.pop();
     });*/
     } );
-    
+
 </script>
 {% endblock %}

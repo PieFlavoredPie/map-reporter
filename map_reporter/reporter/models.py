@@ -1,7 +1,10 @@
+from distutils.command.clean import clean
 from enum import unique
 import re
+from typing import List
 from django.db import models
 from decimal import Decimal
+from django.forms import ValidationError
 from django.utils import timezone
 from mptt.models import MPTTModel, TreeForeignKey
 from django.core.validators import RegexValidator
@@ -13,6 +16,7 @@ from io import BytesIO
 from PIL import Image
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.contrib.auth.models import User, Group
+from . import wc_api
 
 
 class Category(MPTTModel):
@@ -49,39 +53,41 @@ class Product(models.Model):
     map_price = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("0.00"), null=False, blank=False
     )
-    # key_acc_price = models.DecimalField(
-    #     max_digits=5, decimal_places=2, default=Decimal("0.00"), null=False, blank=False
-    # )
     main_category = models.ForeignKey(Category, models.SET_NULL, blank=True, null=True)
     upload_path = "product_images"
     image = models.ImageField(
         upload_to="product_images", default="product_images/placeholder_img.png"
     )
     image_url = models.URLField(null=True, blank=True)
+    # name = models.CharField(blank=True, max_length=200)
+
+    is_cleaned = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_map_price = self.map_price
+        # self.name = self.manufacturer.name + " " + self.model
         # self.__original_key_acc_price = self.key_acc_price
 
+    def clean(self):
+        new_map_price = self.map_price
+        wc_api.update_woocommerce(self, new_map_price)
+        super(Product, self).clean()
+
     def save(self, force_insert=False, force_update=False, *args, **kwargs):
-        # Create new MapPrice and KeyAccPrice objects when these prices change
+        if not self.is_cleaned:
+            self.full_clean()
+
+        # Create new MapPrice objects when these prices change
         old_map_price = self.__original_map_price
         new_map_price = self.map_price
-
-        # old_key_acc_price = self.__original_key_acc_price
-        # new_key_acc_price = self.key_acc_price
         super().save(force_insert, force_update, *args, **kwargs)
 
+        # TODO What happens if the product does not exist?
         if new_map_price != old_map_price:
             MapPrice.objects.create(
                 price=new_map_price, timestamp=timezone.now(), product=self
             )
-
-        # if new_key_acc_price != old_key_acc_price:
-        #     KeyAccPrice.objects.create(
-        #         price=new_key_acc_price, timestamp=timezone.now(), product=self
-        #     )
 
         # Save the image from the image_url field
         if self.image_url:
@@ -113,6 +119,7 @@ class Product(models.Model):
                 sys.getsizeof(output),
                 None,
             )
+
         super(Product, self).save()
 
     def is_active(self):
@@ -122,10 +129,12 @@ class Product(models.Model):
             return "Οχι"
 
     def name(self):
-        return str(self.manufacturer.name + " " + self.model)
+        return str(self.model)
+        # return str(self.manufacturer.name + " " + self.model)
 
     def __str__(self):
-        return str(self.manufacturer.name + " " + self.model)
+        # return str(self.manufacturer.name + " " + self.model)
+        return self.model
 
     @property
     def image_preview(self):
@@ -169,6 +178,7 @@ class Shop(models.Model):
     # phone_regex = RegexValidator(regex=r'^\+?1?\d{9,15}$', message="Phone number must be entered in the format: '+999999999'. Up to 15 digits allowed.")
     phone_number = models.CharField(validators=[phone_regex], blank=True, max_length=10)
     address = models.CharField(max_length=100, default=None, blank=True, null=True)
+    website = models.CharField(blank=True, max_length=100)
 
     def __str__(self):
         return self.name
@@ -187,6 +197,7 @@ class Page(models.Model):
     source = models.ForeignKey(
         Source, on_delete=models.CASCADE, default=None, blank=False, null=False
     )
+    valid = models.BooleanField(default=True)
 
     def __str__(self):
         return self.url
@@ -248,16 +259,3 @@ class RetailPrice(models.Model):
             return "Ναι"
         else:
             return "Όχι"
-
-
-class KeyAccPrice(models.Model):
-    price = models.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal("0.00"), null=False, blank=False
-    )
-    timestamp = models.DateTimeField()
-    product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, blank=False, null=False, default=None
-    )
-
-    def __str__(self):
-        return self.price
