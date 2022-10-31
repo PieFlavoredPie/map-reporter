@@ -1,18 +1,19 @@
-from django.contrib import admin
-from django.db import models
-from mptt.admin import MPTTModelAdmin, DraggableMPTTAdmin, TreeRelatedFieldListFilter
+from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminFileWidget
+from django.db import models
 from django.utils.safestring import mark_safe
+from django.utils.translation import ngettext
+from mptt.admin import DraggableMPTTAdmin, TreeRelatedFieldListFilter
+
 from .models import (
-    Manufacturer,
     Category,
-    Product,
     Manufacturer,
-    Source,
-    Page,
-    Shop,
-    RetailPrice,
     MapPrice,
+    Page,
+    Product,
+    RetailPrice,
+    Shop,
+    Source,
 )
 
 
@@ -42,14 +43,51 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "sku", "map_price", "main_category", "active")
     search_fields = ["sku", "model", "manufacturer__name"]
     list_filter = (
-        ("main_category", TreeRelatedFieldListFilter),
+        "manufacturer",
         "active",
         ("page", admin.EmptyFieldListFilter),
+        ("main_category", TreeRelatedFieldListFilter),
     )
     list_select_related = ("main_category",)
     formfield_overrides = {
         models.ImageField: {"widget": AdminImageWidget},
     }
+
+    @admin.action(description="Deactivate selected products")
+    def deactivate_products(self, request, queryset):
+        updated = queryset.update(active=False)
+        for product in queryset:
+            product.save()
+
+        self.message_user(
+            request,
+            ngettext(
+                "%d product was successfully deactivated.",
+                "%d products were successfully deactivated.",
+                updated,
+            )
+            % updated,
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Activate selected products")
+    def activate_products(self, request, queryset):
+        updated = queryset.update(active=True)
+        for product in queryset:
+            product.save()
+
+        self.message_user(
+            request,
+            ngettext(
+                "%d product was successfully activated.",
+                "%d products were successfully activated.",
+                updated,
+            )
+            % updated,
+            messages.SUCCESS,
+        )
+
+    actions = [deactivate_products, activate_products]
 
 
 class CategoryAdmin(DraggableMPTTAdmin):
@@ -106,14 +144,14 @@ class RetailPriceView(admin.ModelAdmin):
         "source",
         "timestamp",
     )
-    list_filter = ["product", "shop"]
+    search_fields = ["product__model", "shop__name"]
 
 
 class ShopAdminView(admin.ModelAdmin):
     list_display = ("name", "key_account", "seller_last_name")
     list_filter = [
         "key_account",
-        "seller__last_name",
+        ("seller", admin.RelatedOnlyFieldListFilter),
         ("seller", admin.EmptyFieldListFilter),
     ]
     search_fields = ["name"]
@@ -138,6 +176,47 @@ class PageAdminView(admin.ModelAdmin):
         "product__manufacturer__name",
     ]
     list_filter = ["valid", "source"]
+    list_display = ("url", "product", "get_sku", "valid")
+
+    @admin.display(description="Product SKU")
+    def get_sku(self, obj):
+        return obj.product.sku
+
+    @admin.action(description="Invalidate selected pages")
+    def invalidate_pages(self, request, queryset):
+        updated = queryset.update(valid=False)
+        for page in queryset:
+            page.save()
+
+        self.message_user(
+            request,
+            ngettext(
+                "%d page was successfully invalidated.",
+                "%d pages were successfully invalidated.",
+                updated,
+            )
+            % updated,
+            messages.SUCCESS,
+        )
+
+    @admin.action(description="Validate selected pages")
+    def validate_pages(self, request, queryset):
+        updated = queryset.update(valid=True)
+        for page in queryset:
+            page.save()
+
+        self.message_user(
+            request,
+            ngettext(
+                "%d page was successfully validated.",
+                "%d pages were successfully validated.",
+                updated,
+            )
+            % updated,
+            messages.SUCCESS,
+        )
+
+    actions = [invalidate_pages, validate_pages]
 
 
 admin.site.register(Category, CategoryAdmin)

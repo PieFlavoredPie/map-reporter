@@ -1,21 +1,20 @@
-from distutils.command.clean import clean
-from enum import unique
-import re
-from typing import List
-from django.db import models
+import os
+import sys
+import urllib
 from decimal import Decimal
-from django.forms import ValidationError
-from django.utils import timezone
-from mptt.models import MPTTModel, TreeForeignKey
-from django.core.validators import RegexValidator
-from django.utils.safestring import mark_safe
-import os, urllib, sys
-from urllib.parse import urlparse
-from urllib.request import urlretrieve
 from io import BytesIO
-from PIL import Image
+from typing import List
+from urllib.parse import urlparse
+
+from django.contrib.auth.models import User
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.contrib.auth.models import User, Group
+from django.core.validators import RegexValidator
+from django.db import models
+from django.utils import timezone
+from django.utils.safestring import mark_safe
+from mptt.models import MPTTModel, TreeForeignKey
+from PIL import Image
+
 from . import wc_api
 
 
@@ -36,6 +35,11 @@ class Category(MPTTModel):
         verbose_name_plural = "Categories"
 
 
+def get_default_category():
+    # Return a category to use as a default value
+    return Category.objects.get_or_create(name="No Category")[0].id
+
+
 class Manufacturer(models.Model):
     name = models.CharField(max_length=50)
 
@@ -43,9 +47,18 @@ class Manufacturer(models.Model):
         return self.name
 
 
+def get_default_manufacturer():
+    # Return a manufaturer to use as a default value
+    return Manufacturer.objects.get_or_create(name="No Manufacturer")[0].id
+
+
 class Product(models.Model):
     manufacturer = models.ForeignKey(
-        Manufacturer, models.SET_NULL, blank=True, null=True
+        Manufacturer,
+        models.SET_DEFAULT,
+        blank=False,
+        null=False,
+        default=get_default_manufacturer,
     )
     model = models.CharField(max_length=100)
     sku = models.CharField(max_length=20)
@@ -53,7 +66,13 @@ class Product(models.Model):
     map_price = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("0.00"), null=False, blank=False
     )
-    main_category = models.ForeignKey(Category, models.SET_NULL, blank=True, null=True)
+    main_category = models.ForeignKey(
+        Category,
+        models.SET_DEFAULT,
+        blank=False,
+        null=False,
+        default=get_default_category,
+    )
     upload_path = "product_images"
     image = models.ImageField(
         upload_to="product_images", default="product_images/placeholder_img.png"
@@ -126,7 +145,7 @@ class Product(models.Model):
         if self.active:
             return "Ναι"
         else:
-            return "Οχι"
+            return "Όχι"
 
     def name(self):
         return str(self.model)
@@ -220,6 +239,9 @@ class RetailPrice(models.Model):
     price = models.DecimalField(
         max_digits=6, decimal_places=2, default=Decimal("0.00"), null=False, blank=False
     )
+    original_price = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal("0.00"), null=True, blank=True
+    )
     timestamp = models.DateTimeField()
     product = models.ForeignKey(Product, on_delete=models.CASCADE, default=None)
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, default=None)
@@ -230,6 +252,9 @@ class RetailPrice(models.Model):
     source = models.ForeignKey(
         Source, on_delete=models.CASCADE, default=None, blank=False, null=False
     )
+
+    def __str__(self):
+        return str(self.price)
 
     def get_shop_products(shop_id):
         retailprices = RetailPrice.objects.filter(shop=shop_id)

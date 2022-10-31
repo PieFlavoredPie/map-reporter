@@ -1,9 +1,9 @@
 import concurrent.futures
 import logging.handlers
-import os, subprocess
+import os
 import random
 import smtplib
-import sys
+import subprocess
 import time
 import traceback
 from datetime import datetime
@@ -17,9 +17,10 @@ from itertools import product, zip_longest
 import pandas as pd
 import psutil
 from bs4 import BeautifulSoup
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.utils import timezone
-from Proxy_List_Scrapper import Scrapper
+
+# from Proxy_List_Scrapper import Scrapper
 from reporter.models import *
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
@@ -34,9 +35,9 @@ class Command(BaseCommand):
     # if __name__ == '__main__':
 
     def handle(self, *args, **options):
-        global proxy
-        global my_proxies
-        my_proxies = []
+        # global proxy
+        #  global my_proxies
+        #  my_proxies = []
         records = []
         page_list = Page.objects.filter(valid=True)
         failedRecords = []
@@ -66,17 +67,21 @@ class Command(BaseCommand):
                             page_list.append(url)
                         else:
                             page = Page.objects.get(id=url.id)
+                            print(
+                                "## Invalidating this page:",
+                                page.url,
+                            )
                             page.valid = False
                             page.save()
 
                     else:
+                        todayDate = datetime.today().strftime("%d-%m-%Y")
+                        time_needed = datetime.now() - startTime
+                        time_needed = str(time_needed)
                         if data != "Key Account":
                             records.append(data)
-                            todayDate = datetime.today().strftime("%d-%m-%Y")
-                            time_needed = datetime.now() - startTime
-                            time_needed = str(time_needed)
                             print(
-                                "*** *** *** Processed URLs: "
+                                "*** Processed URLs: "
                                 + format(len(records))
                                 + " in "
                                 + format(time_needed)
@@ -102,16 +107,18 @@ def parse_urls(page_list_item):
     product_id = page_list_item.product_id
     source_id = page_list_item.source_id
     url = page_list_item.url
-    global my_proxies
-    global proxy
+    orig_price = None
+    print("Now scraping: ", url)
+    #  global my_proxies
+    # global proxy
     info = []
-    if my_proxies is None or len(my_proxies) <= 10:
-        my_proxies = get_new_proxies()
+    #  if my_proxies is None or len(my_proxies) <= 10:
+    #  my_proxies = get_new_proxies()
     driver = ""
     while True:
         try:
-            proxy_tmp = random.choice(my_proxies)
-            proxy = proxy_tmp
+            #  proxy_tmp = random.choice(my_proxies)
+            #  proxy = proxy_tmp
             # print('+++ +++ Selecting new proxy: ', proxy)
             # print('+++ Proxies left: ', len(my_proxies))
             # print('+++ Proxy used: ', proxy)
@@ -138,19 +145,20 @@ def parse_urls(page_list_item):
             driver.get(url)
             break
         except:
-            print("~~ Connection error, removing proxy from list")
-            # no_connect = True
             driver.quit()
-            if proxy in my_proxies:
-                my_proxies.remove(proxy)
-                print("*** Proxy Removed *** ", len(my_proxies))
-            if len(my_proxies) <= 50:
-                print(
-                    "&&& Remaining my_proxies: ",
-                    len(my_proxies),
-                    ". Trying to find new my_proxies",
-                )
-                my_proxies = get_new_proxies()
+            print(url)
+            print("~~ Connection error, maybe. Quited driver and will try again")
+            # no_connect = True
+            #  if proxy in my_proxies:
+            #  my_proxies.remove(proxy)
+            #  print("*** Proxy Removed *** ", len(my_proxies))
+            #  if len(my_proxies) <= 50:
+            #  print(
+            #  "&&& Remaining my_proxies: ",
+            #  len(my_proxies),
+            #  ". Trying to find new my_proxies",
+            #  )
+            #  my_proxies = get_new_proxies()
 
     # sleep for random amount of time
     secs = random.random() + 1
@@ -229,7 +237,7 @@ def parse_urls(page_list_item):
                     off_seller = "Μ/Δ"
                 else:
                     if len(shop) < 1:
-                        raise ValueError
+                        raise ValueError("Shops less than 1")
                     price = soup.findAll("strong", class_="dominant-price")
                     off_seller = soup.findAll("div", class_="shop-info-row")
                     # Clean data
@@ -263,7 +271,7 @@ def parse_urls(page_list_item):
             info.append(price)
             info.append(off_seller)
             # info.append(page_id)
-            # save_prices(price, product_id, shop, off_seller, source_id)
+            save_prices(price, product_id, shop, off_seller, source_id)
 
         elif source_id == 2:  # Plaisio
             soup = BeautifulSoup(driver.page_source, "lxml")
@@ -273,11 +281,23 @@ def parse_urls(page_list_item):
             ):
                 print("*** Network Error ***")
                 raise ValueError("Network Error")
+            if not soup.find("div", class_="pdp-stock"):
+                page_list_item.retries = 3
+                raise ValueError("Page is going to be invalidated.")
             pricear = soup.select(
                 ".pdp-price-container .pdp-price-container__price .product-price .price"
             )
+            orig_pricear = soup.select(
+                ".pdp-price-container .pdp-price-container__price .product-price .from-price"
+            )
+
             if pricear:
                 price = pricear[0].text.strip(" €").strip().replace(",", ".")
+                if orig_pricear[0].text:
+                    orig_price = (
+                        orig_pricear[0].text.strip(" €").strip().replace(",", ".")
+                    )
+                    orig_price = float(orig_price)
                 price = [price]
                 shop = ["Plaisio"]
                 off_seller = ["1"]
@@ -291,17 +311,30 @@ def parse_urls(page_list_item):
             ):
                 print("*** Network Error ***")
                 raise ValueError("Network Error")
-            pricear = soup.select("span.product__price.product__price--main")
-            pricear_sale = soup.select(
-                "span.product__price.product__price--main.product__price--discounted"
-            )
+            if not soup.find("div", class_="product__prices").text.strip():
+                page_list_item.retries = 3
+                raise ValueError("Page is going to be invalidated.")
+            pricear = soup.select("div.product__prices")
             shop = "Praktiker"
             if pricear:
-                price = pricear[0].text.strip().replace(",", ".").rstrip().strip("€")
-            elif pricear_sale:
-                price = (
-                    pricear_sale[0].text.strip().replace(",", ".").rstrip().strip("€")
-                )
+                for elem in pricear:
+                    if elem.find("span", "product__price--main"):
+                        price = (
+                            elem.find("span", "product__price--main")
+                            .text.strip()
+                            .replace(",", ".")
+                            .rstrip()
+                            .strip("€")
+                        )
+                    if elem.find("span", "product__price--deleted"):
+                        orig_price = (
+                            elem.find("span", "product__price--deleted")
+                            .text.strip()
+                            .replace(",", ".")
+                            .rstrip()
+                            .strip("€")
+                        )
+                        orig_price = float(orig_price)
             if price is not None:
                 price = [price]
                 shop = ["Praktiker"]
@@ -310,6 +343,9 @@ def parse_urls(page_list_item):
 
         elif source_id == 4:  # Kotsovolos
             soup = BeautifulSoup(driver.page_source, "lxml")
+            if not soup.find("button", class_="addItemToCartBtn"):
+                page_list_item.retries = 3
+                raise ValueError("Page is going to be invalidated.")
             pricear = soup.select(".prDetail .priceWithVat .simplePrice")
             pricear_sale = soup.select(".prDetail .priceWithVat .price")
             shop = "Kotsovolos"
@@ -318,6 +354,9 @@ def parse_urls(page_list_item):
                 price = pricear[0].text.strip().replace(",", ".")
             elif pricear_sale:
                 for elem in pricear_sale:
+                    if elem.find("span", "displayPrice"):
+                        elem.find("span", "displayPrice").decompose()
+                        orig_price = float(elem.text.strip().replace(",", "."))
                     if elem.find("span", "main-price"):
                         elem.find("span", "main-price").decompose()
                         price = elem.text.strip().replace(",", ".")
@@ -330,10 +369,17 @@ def parse_urls(page_list_item):
         elif source_id == 5:  # Public
             soup = BeautifulSoup(driver.page_source, "lxml")
             pricear = soup.select(
-                "div.product__price.product__price--xlarge.text-primary"
+                "div.product__actions__top div.product__price.product__price--xlarge.text-primary"
             )
             if pricear and pricear != "" and "\n" not in pricear[0].text:
                 price = pricear[0].text.strip(" €").replace(",", ".")
+                orig_pricear = soup.select(
+                    "div.product__actions__top div.product__price.product__price--initial span"
+                )
+
+                if orig_pricear and orig_pricear[0].text.strip():
+                    orig_price = orig_pricear[0].text.strip()
+                    orig_price = float(orig_price)
             if price is not None:
                 price = [price]
                 shop = ["Public"]
@@ -353,9 +399,17 @@ def parse_urls(page_list_item):
 
         elif source_id == 7:  # Media Markt
             soup = BeautifulSoup(driver.page_source, "lxml")
-            pricear = soup.select("div.article__price.ng-star-inserted")
+            if not soup.find("button", class_="btn-cart"):
+                page_list_item.retries = 3
+                raise ValueError("Page is going to be invalidated.")
+            pricear = soup.select('div[class="article__price"]')
+            orig_pricear = soup.select('div[class="article__price article__price--sm"]')
+            # only_this = soup.select('img[class="this"]')
             if pricear:
                 price = pricear[0].text.replace(",", ".")
+            if orig_pricear:
+                orig_price = orig_pricear[0].text.replace(",", ".")
+                orig_price = float(orig_price)
             if price is not None:
                 price = [price]
                 shop = ["Media Markt"]
@@ -363,14 +417,26 @@ def parse_urls(page_list_item):
 
         elif source_id == 8:  # Germanos
             soup = BeautifulSoup(driver.page_source, "lxml")
-            pricear = soup.select("div.product-price span.price")
-            pricear_sale = soup.select("div.product-price span.special-price")
+            pricear = soup.select("div.product-price div.price")
+            pricear_sale = soup.select("div.product-price div.special-price")
             if pricear:
                 price = pricear[0].text.strip().replace(",", ".").rstrip().strip("€")
             elif pricear_sale:
                 price = (
                     pricear_sale[0].text.strip().replace(",", ".").rstrip().strip("€")
                 )
+                orig_pricear = soup.select(
+                    "div.product-price div.strikethrough span.oldprice-strikethrough"
+                )
+                if orig_pricear[0].text.strip():
+                    orig_price = (
+                        orig_pricear[0]
+                        .text.strip()
+                        .replace(",", ".")
+                        .rstrip()
+                        .strip("€")
+                    )
+                    orig_price = float(orig_price)
             if price is not None:
                 price = [price]
                 shop = ["Germanos"]
@@ -400,7 +466,7 @@ def parse_urls(page_list_item):
             return True
     except:
         driver.quit()
-        raise ValueError()
+        raise ValueError("Could not parse page.")
 
     # info.append(url)
     # info.append(title)
@@ -412,7 +478,11 @@ def parse_urls(page_list_item):
     driver.quit()
     print("DRIVER MURDERED - THIS IS AN EX DRIVER")
     try:
-        save_prices(price, product_id, shop, off_seller, source_id)
+        if orig_price is None:
+            save_prices(price, product_id, shop, off_seller, source_id)
+        else:
+            save_prices(price, product_id, shop, off_seller, source_id, orig_price)
+        # pass
     except Exception as e:
         print(e)
         return False
@@ -422,7 +492,9 @@ def parse_urls(page_list_item):
         return "Key Account"
 
 
-def save_prices(price_list, product_id, shop, official_reseller, source_id):
+def save_prices(
+    price_list, product_id, shop, official_reseller, source_id, orig_price=0
+):
     # The below stores time in UTC, but Django can convert and compare time by itself using the user's timezone. In case you definately need the local time use this: timenow = timezone.localtime(timezone.now())
     timenow = timezone.now()
     product_obj = Product.objects.get(id=product_id)
@@ -438,21 +510,23 @@ def save_prices(price_list, product_id, shop, official_reseller, source_id):
             curr_target_price=product_obj.map_price,
             source=source_obj,
         )
+        if orig_price > 0:
+            rp.original_price = orig_price
         rp.save()
 
 
 # ~ Get my_proxies
 
 
-def get_new_proxies():
-    proxies_list = []
-    scrapper = Scrapper(category="ALL", print_err_trace=False)
-    proxies_obj = scrapper.getProxies()
+#  def get_new_proxies():
+#  proxies_list = []
+#  scrapper = Scrapper(category="ALL", print_err_trace=False)
+#  proxies_obj = scrapper.getProxies()
 
-    for item in proxies_obj.proxies:
-        proxies_list.append(item.ip + ":" + item.port)
+#  for item in proxies_obj.proxies:
+#  proxies_list.append(item.ip + ":" + item.port)
 
-    return proxies_list
+#  return proxies_list
 
 
 # Send the emails

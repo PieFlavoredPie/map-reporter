@@ -96,18 +96,32 @@
                             </div>
                             <div class="col-8 g-0">
                                 <div class="row g-0">
-                                    {% for url in urls %}
-                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
+                                    {% for url in valid_urls %}
+                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
                                     {% endfor %}
                                 </div>
                             </div>
                         </div>
+                        {% if user_is_staff and invalid_urls|length > 0 %}
+                        <div class="row gx-5 bg-danger bg-opacity-10 mt-2">
+                            <div class="col-4 g-0">
+                                <h5 class="p-2">Σελίδες με πρόβλημα</h5>
+                            </div>
+                            <div class="col-8 g-0">
+                                <div class="row g-0">
+                                    {% for url in invalid_urls %}
+                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
             </div>
         </div>
-
+        {% if data_exists%}
     <div class="row pt-lg-5">
         <div class="col-xl-6">
             <div class="card h-100">
@@ -137,7 +151,7 @@
             <div class="row">
                 <form name="date_range" id="date-picker-form" hx-post="/update_date/{{product.id}}" hx-trigger="submit" hx-swap="none" hx-target-error="error_notice">
                     <div class="row">
-                        <p>Επιλέξτε ημερομηνίες και καταστήματα από τη φόρμα για να εμφανίσετε την πορεία των τιμών του προϊόντος ανάμεσα στις επιλεγμένες ημερομηνίες για τα καταστήματα που επιθυμείτε στα παρακάτω γραφήματα.</p>
+                        <p>Επιλέξτε ημερομηνίες, ώρες και καταστήματα από τη φόρμα για να εμφανίσετε την πορεία των τιμών του προϊόντος ανάμεσα στις επιλεγμένες ημερομηνίες για τα καταστήματα που επιθυμείτε στα παρακάτω γραφήματα.</p>
                         <div class="col-lg-12">
                             <div class="m-2 d-inline-block">
                                 {{date_picker}}
@@ -432,7 +446,6 @@
             // Update the charts
             const my_response_text = evt.detail.xhr.response;
             my_response = JSON.parse(my_response_text);
-            console.log(my_response);
             new_timestamp = "Τελευταία ενημέρωση " + my_response.date_to;
             $('.latest_timestamp').each(function(i, e){
                 $(e).text(new_timestamp);
@@ -839,5 +852,7 @@ table_1.draw();
 } );
 //TABLE_1 STUFF ENDS
 </script>
-
+{% else %}
+<div class="alert alert-danger mt-2" role="alert">Δεν βρέθηκαν δεδομένα.</div>
+{% endif %}
 {% endblock main %}

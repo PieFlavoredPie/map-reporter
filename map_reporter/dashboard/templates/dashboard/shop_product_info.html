@@ -98,16 +98,30 @@
                         </div>
                         <div class="row gx-5 bg-secondary bg-opacity-25">
                             <div class="col-4 g-0">
-                                <h5 class="p-sm-2">Σελίδες</h5>
+                                <h5 class="p-2">Σελίδες</h5>
                             </div>
                             <div class="col-8 g-0">
                                 <div class="row g-0">
-                                    {% for url in urls %}
-                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
+                                    {% for url in valid_urls %}
+                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
                                     {% endfor %}
                                 </div>
                             </div>
                         </div>
+                        {% if user_is_staff and invalid_urls|length > 0 %}
+                        <div class="row gx-5 bg-danger bg-opacity-10 mt-2">
+                            <div class="col-4 g-0">
+                                <h5 class="p-2">Σελίδες με πρόβλημα</h5>
+                            </div>
+                            <div class="col-8 g-0">
+                                <div class="row g-0">
+                                    {% for url in invalid_urls %}
+                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="text-truncate mt-2 link-dark">{{ url }}</a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -147,7 +161,7 @@
             </div>
         </div>
     </div>
-
+    {% if data_exists %}
 <div class="row pt-lg-5">
     <div class="col-xl-6">
         <div class="card h-100">
@@ -821,5 +835,7 @@ config_the_table();
 } );
 //TABLE_1 STUFF ENDS
 </script>
-
+{% else %}
+<div class="alert alert-danger mt-2" role="alert">Δεν βρέθηκαν δεδομένα.</div>
+{% endif %}
 {% endblock main %}
